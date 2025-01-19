@@ -5,19 +5,6 @@ BLACK = 1
 WHITE = 2
 INF = math.inf
 
-# 初期盤面 (8×8)
-board = [
-    [0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 1, 2, 0, 0, 0],
-    [0, 0, 0, 2, 1, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0],
-]
-
-# 評価関数
 def evaluate_board(board, stone):
     """
     改良された評価関数。盤面の状態を数値化する。
@@ -27,12 +14,12 @@ def evaluate_board(board, stone):
 
     # フェーズの判定
     empty_squares = sum(row.count(0) for row in board)
-    early_game = empty_squares > 50
-    mid_game = 20 < empty_squares <= 50
-    late_game = empty_squares <= 20
+    early_game = empty_squares > 30
+    mid_game = 15 < empty_squares <= 30
+    late_game = empty_squares <= 15
 
     # 角の評価
-    corners = [(0, 0), (0, 7), (7, 0), (7, 7)]
+    corners = [(0, 0), (0, 5), (5, 0), (5, 5)]
     for x, y in corners:
         if board[y][x] == stone:
             score += 100
@@ -60,7 +47,6 @@ def evaluate_board(board, stone):
 
     return score
 
-# 安定石の判定
 def is_stable(board, x, y, stone):
     """
     石が安定しているか（動かされる可能性がないか）を判定。
@@ -77,7 +63,6 @@ def is_stable(board, x, y, stone):
             ny += dy
     return True
 
-# 石を置けるか判定
 def can_place_x_y(board, stone, x, y):
     if board[y][x] != 0:
         return False
@@ -98,7 +83,6 @@ def can_place_x_y(board, stone, x, y):
 
     return False
 
-# 打てる手を取得
 def get_possible_moves(board, stone):
     moves = []
     for y in range(len(board)):
@@ -107,7 +91,6 @@ def get_possible_moves(board, stone):
                 moves.append((x, y))
     return moves
 
-# Minimaxアルゴリズム
 def minimax(board, depth, alpha, beta, maximizing_player, stone):
     possible_moves = get_possible_moves(board, stone)
     opponent = 3 - stone
@@ -140,7 +123,6 @@ def minimax(board, depth, alpha, beta, maximizing_player, stone):
                 break
         return min_eval
 
-# 最善手を取得
 def best_move(board, stone):
     best_value = -INF
     best_move = None
@@ -149,7 +131,7 @@ def best_move(board, stone):
     for move in possible_moves:
         x, y = move
         board[y][x] = stone
-        move_value = minimax(board, 6 if len(get_possible_moves(board, stone)) < 15 else 4, -INF, INF, False, stone)
+        move_value = minimax(board, 6 if len(get_possible_moves(board, stone)) < 10 else 4, -INF, INF, False, stone)
         board[y][x] = 0
 
         if move_value > best_value:
@@ -158,7 +140,6 @@ def best_move(board, stone):
 
     return best_move
 
-# AIクラス
 class birdAI:
     def face(self):
         return "🦉"
