@@ -1,48 +1,60 @@
 import math
-from functools import lru_cache
+import random
 
 BLACK = 1
 WHITE = 2
 INF = math.inf
 
-# 位置評価マトリクス（静的評価に使用）
-POSITIONAL_WEIGHT = [
-    [100, -20, 10, 10, -20, 100],
-    [-20, -50, -2, -2, -50, -20],
-    [10, -2, 5, 5, -2, 10],
-    [10, -2, 5, 5, -2, 10],
-    [-20, -50, -2, -2, -50, -20],
-    [100, -20, 10, 10, -20, 100]
-]
-
-@lru_cache(None)  # キャッシュを使用して効率化
-def evaluate_board(board_tuple, stone):
+def evaluate_board(board, stone):
     """
-    改良された評価関数（静的評価 + 動的評価）。
+    改良された評価関数。盤面の状態を数値化する。
     """
-    board = [list(row) for row in board_tuple]
     opponent = 3 - stone
     score = 0
 
-    # 角・辺・位置評価
+    # フェーズの判定
+    empty_squares = sum(row.count(0) for row in board)
+    early_game = empty_squares > 30
+    mid_game = 15 < empty_squares <= 30
+    late_game = empty_squares <= 15
+
+    # 角の評価
+    corners = [(0, 0), (0, 5), (5, 0), (5, 5)]
+    for x, y in corners:
+        if board[y][x] == stone:
+            score += 100
+        elif board[y][x] == opponent:
+            score -= 100
+
+    # 安定石の評価（動かせない石）
     for y in range(len(board)):
         for x in range(len(board[0])):
-            if board[y][x] == stone:
-                score += POSITIONAL_WEIGHT[y][x]
-            elif board[y][x] == opponent:
-                score -= POSITIONAL_WEIGHT[y][x]
+          # Check if x and y are within bounds before accessing board[y][x]
+            if 0 <= y < len(board) and 0 <= x < len(board[0]):
+                if board[y][x] == stone and is_stable(board, x, y, stone):
+                    score += 20
+                elif board[y][x] == opponent and is_stable(board, x, y, opponent):
+                    score -= 20
 
     # モビリティ（合法手の数）
     mobility = len(get_possible_moves(board, stone))
     opponent_mobility = len(get_possible_moves(board, opponent))
-    score += (mobility - opponent_mobility) * 10
+    score += (mobility - opponent_mobility) * (15 if early_game else 5)
+
+    # 終盤は石の数を重視
+    if late_game:
+        player_count = sum(row.count(stone) for row in board)
+        opponent_count = sum(row.count(opponent) for row in board)
+        score += (player_count - opponent_count) * 10
 
     return score
 
 def is_stable(board, x, y, stone):
     """
-    石が安定しているかを判定。
+    石が安定しているか（動かされる可能性がないか）を判定。
     """
+    if board[y][x] != stone:
+        return False
     directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
     for dx, dy in directions:
         nx, ny = x + dx, y + dy
@@ -53,21 +65,7 @@ def is_stable(board, x, y, stone):
             ny += dy
     return True
 
-def get_possible_moves(board, stone):
-    """
-    石を置けるすべての合法手を取得。
-    """
-    moves = []
-    for y in range(len(board)):
-        for x in range(len(board[0])):
-            if can_place_x_y(board, stone, x, y):
-                moves.append((x, y))
-    return moves
-
 def can_place_x_y(board, stone, x, y):
-    """
-    その位置に石を置けるかを判定。
-    """
     if board[y][x] != 0:
         return False
     opponent = 3 - stone
@@ -87,20 +85,24 @@ def can_place_x_y(board, stone, x, y):
 
     return False
 
+def get_possible_moves(board, stone):
+    moves = []
+    for y in range(len(board)):
+        for x in range(len(board[0])):
+            if can_place_x_y(board, stone, x, y):
+                moves.append((x, y))
+    return moves
+
 def minimax(board, depth, alpha, beta, maximizing_player, stone):
-    """
-    アルファベータ探索。
-    """
     possible_moves = get_possible_moves(board, stone)
     opponent = 3 - stone
 
     if depth == 0 or not possible_moves:
-        board_tuple = tuple(tuple(row) for row in board)  # キャッシュ用に変換
-        return evaluate_board(board_tuple, stone)
+        return evaluate_board(board, stone)
 
     if maximizing_player:
         max_eval = -INF
-        for move in sorted(possible_moves, key=lambda m: POSITIONAL_WEIGHT[m[1]][m[0]], reverse=True):
+        for move in possible_moves:
             x, y = move
             board[y][x] = stone
             eval = minimax(board, depth - 1, alpha, beta, False, stone)
@@ -112,7 +114,7 @@ def minimax(board, depth, alpha, beta, maximizing_player, stone):
         return max_eval
     else:
         min_eval = INF
-        for move in sorted(possible_moves, key=lambda m: POSITIONAL_WEIGHT[m[1]][m[0]]):
+        for move in possible_moves:
             x, y = move
             board[y][x] = opponent
             eval = minimax(board, depth - 1, alpha, beta, True, stone)
@@ -124,9 +126,6 @@ def minimax(board, depth, alpha, beta, maximizing_player, stone):
         return min_eval
 
 def best_move(board, stone):
-    """
-    最善手を探索。
-    """
     best_value = -INF
     best_move = None
     possible_moves = get_possible_moves(board, stone)
@@ -134,7 +133,7 @@ def best_move(board, stone):
     for move in possible_moves:
         x, y = move
         board[y][x] = stone
-        move_value = minimax(board, 6, -INF, INF, False, stone)
+        move_value = minimax(board, 6 if len(get_possible_moves(board, stone)) < 10 else 4, -INF, INF, False, stone)
         board[y][x] = 0
 
         if move_value > best_value:
